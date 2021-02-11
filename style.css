@@ -1,0 +1,14 @@
+h1{
+  margin: 2rem 0;
+  font-family: monospace;
+  font-size: 50px;
+  color: #dc3545;
+}
+
+#love-thing {
+  margin: 2rem 0;
+  font-size: 25px;
+  font-family: monospace;
+  font-style: italic;
+  color: #f7f7f7
+}
