@@ -1,0 +1,1025 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Copy of Train a GPT-2 Text-Generating Model w/ GPU",
+      "provenance": [],
+      "collapsed_sections": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "accelerator": "GPU"
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/sreejapav/sreejapav.github.io/blob/master/nyt%20cooking%20comments%20generator\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "H7LoMj4GA4n_"
+      },
+      "source": [
+        "#  Train a GPT-2 Text-Generating Model w/ GPU For Free \n",
+        "\n",
+        "by [Max Woolf](http://minimaxir.com)\n",
+        "\n",
+        "*Last updated: February 14th, 2021*\n",
+        "\n",
+        "Retrain an advanced text generating neural network on any text dataset **for free on a GPU using Collaboratory** using `gpt-2-simple`!\n",
+        "\n",
+        "For more about `gpt-2-simple`, you can visit [this GitHub repository](https://github.com/minimaxir/gpt-2-simple). You can also read my [blog post](https://minimaxir.com/2019/09/howto-gpt2/) for more information how to use this notebook!\n",
+        "\n",
+        "\n",
+        "To get started:\n",
+        "\n",
+        "1. Copy this notebook to your Google Drive to keep it and save your changes. (File -> Save a Copy in Drive)\n",
+        "2. Make sure you're running the notebook in Google Chrome.\n",
+        "3. Run the cells below:\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "KBkpRgBCBS2_",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "f2dd9fb9-9b77-40da-94bf-ec14c5839321"
+      },
+      "source": [
+        "%tensorflow_version 1.x\n",
+        "!pip install -q gpt-2-simple\n",
+        "import gpt_2_simple as gpt2\n",
+        "from datetime import datetime\n",
+        "from google.colab import files"
+      ],
+      "execution_count": 1,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "TensorFlow 1.x selected.\n",
+            "  Building wheel for gpt-2-simple (setup.py) ... \u001b[?25l\u001b[?25hdone\n",
+            "WARNING:tensorflow:\n",
+            "The TensorFlow contrib module will not be included in TensorFlow 2.0.\n",
+            "For more information, please see:\n",
+            "  * https://github.com/tensorflow/community/blob/master/rfcs/20180907-contrib-sunset.md\n",
+            "  * https://github.com/tensorflow/addons\n",
+            "  * https://github.com/tensorflow/io (for I/O related ops)\n",
+            "If you depend on functionality not listed there, please file an issue.\n",
+            "\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "jbTibfd4qITA",
+        "outputId": "826b6819-5aeb-49fd-dcfc-634fb720bb24"
+      },
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "execution_count": 2,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Mounted at /content/drive\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Bj2IJLHP3KwE"
+      },
+      "source": [
+        "## GPU\n",
+        "\n",
+        "Colaboratory uses either a Nvidia T4 GPU or an Nvidia K80 GPU. The T4 is slightly faster than the old K80 for training GPT-2, and has more memory allowing you to train the larger GPT-2 models and generate more text.\n",
+        "\n",
+        "You can verify which GPU is active by running the cell below."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "sUmTooTW3osf",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "c26ffa90-7083-422a-b4ab-46c32540b929"
+      },
+      "source": [
+        "!nvidia-smi"
+      ],
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Sat Oct  9 06:06:44 2021       \n",
+            "+-----------------------------------------------------------------------------+\n",
+            "| NVIDIA-SMI 470.74       Driver Version: 460.32.03    CUDA Version: 11.2     |\n",
+            "|-------------------------------+----------------------+----------------------+\n",
+            "| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n",
+            "| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |\n",
+            "|                               |                      |               MIG M. |\n",
+            "|===============================+======================+======================|\n",
+            "|   0  Tesla K80           Off  | 00000000:00:04.0 Off |                    0 |\n",
+            "| N/A   32C    P8    29W / 149W |      0MiB / 11441MiB |      0%      Default |\n",
+            "|                               |                      |                  N/A |\n",
+            "+-------------------------------+----------------------+----------------------+\n",
+            "                                                                               \n",
+            "+-----------------------------------------------------------------------------+\n",
+            "| Processes:                                                                  |\n",
+            "|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |\n",
+            "|        ID   ID                                                   Usage      |\n",
+            "|=============================================================================|\n",
+            "|  No running processes found                                                 |\n",
+            "+-----------------------------------------------------------------------------+\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "0wXB05bPDYxS"
+      },
+      "source": [
+        "## Downloading GPT-2\n",
+        "\n",
+        "If you're retraining a model on new text, you need to download the GPT-2 model first. \n",
+        "\n",
+        "There are three released sizes of GPT-2:\n",
+        "\n",
+        "* `124M` (default): the \"small\" model, 500MB on disk.\n",
+        "* `355M`: the \"medium\" model, 1.5GB on disk.\n",
+        "* `774M`: the \"large\" model, cannot currently be finetuned with Colaboratory but can be used to generate text from the pretrained model (see later in Notebook)\n",
+        "* `1558M`: the \"extra large\", true model. Will not work if a K80/P4 GPU is attached to the notebook. (like `774M`, it cannot be finetuned).\n",
+        "\n",
+        "Larger models have more knowledge, but take longer to finetune and longer to generate text. You can specify which base model to use by changing `model_name` in the cells below.\n",
+        "\n",
+        "The next cell downloads it from Google Cloud Storage and saves it in the Colaboratory VM at `/models/<model_name>`.\n",
+        "\n",
+        "This model isn't permanently saved in the Colaboratory VM; you'll have to redownload it if you want to retrain it at a later time."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "P8wSlgXoDPCR",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "5c28ce59-b721-416b-968a-4496eab237df"
+      },
+      "source": [
+        "gpt2.download_gpt2(model_name=\"124M\")"
+      ],
+      "execution_count": 4,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "Fetching checkpoint: 1.05Mit [00:00, 223Mit/s]                                                      \n",
+            "Fetching encoder.json: 1.05Mit [00:01, 946kit/s]\n",
+            "Fetching hparams.json: 1.05Mit [00:00, 566Mit/s]                                                    \n",
+            "Fetching model.ckpt.data-00000-of-00001: 498Mit [01:19, 6.26Mit/s]                                  \n",
+            "Fetching model.ckpt.index: 1.05Mit [00:00, 355Mit/s]                                                \n",
+            "Fetching model.ckpt.meta: 1.05Mit [00:00, 1.11Mit/s]\n",
+            "Fetching vocab.bpe: 1.05Mit [00:00, 1.10Mit/s]\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "N8KXuKWzQSsN"
+      },
+      "source": [
+        "## Mounting Google Drive\n",
+        "\n",
+        "The best way to get input text to-be-trained into the Colaboratory VM, and to get the trained model *out* of Colaboratory, is to route it through Google Drive *first*.\n",
+        "\n",
+        "Running this cell (which will only work in Colaboratory) will mount your personal Google Drive in the VM, which later cells can use to get data in/out. (it will ask for an auth code; that auth is not saved anywhere)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "puq4iC6vUAHc",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "b06c4d69-9460-4550-e849-5cf29e279620"
+      },
+      "source": [
+        "gpt2.mount_gdrive()"
+      ],
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "BT__brhBCvJu"
+      },
+      "source": [
+        "## Uploading a Text File to be Trained to Colaboratory\n",
+        "\n",
+        "In the Colaboratory Notebook sidebar on the left of the screen, select *Files*. From there you can upload files:\n",
+        "\n",
+        "![alt text](https://i.imgur.com/TGcZT4h.png)\n",
+        "\n",
+        "Upload **any smaller text file**  (<10 MB) and update the file name in the cell below, then run the cell."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "6OFnPCLADfll"
+      },
+      "source": [
+        "file_name = \"comments.csv\""
+      ],
+      "execution_count": 6,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "HeeSKtNWUedE"
+      },
+      "source": [
+        "If your text file is larger than 10MB, it is recommended to upload that file to Google Drive first, then copy that file from Google Drive to the Colaboratory VM."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-Z6okFD8VKtS"
+      },
+      "source": [
+        "gpt2.copy_file_from_gdrive(file_name)"
+      ],
+      "execution_count": 7,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "LdpZQXknFNY3"
+      },
+      "source": [
+        "## Finetune GPT-2\n",
+        "\n",
+        "The next cell will start the actual finetuning of GPT-2. It creates a persistent TensorFlow session which stores the training config, then runs the training for the specified number of `steps`. (to have the finetuning run indefinitely, set `steps = -1`)\n",
+        "\n",
+        "The model checkpoints will be saved in `/checkpoint/run1` by default. The checkpoints are saved every 500 steps (can be changed) and when the cell is stopped.\n",
+        "\n",
+        "The training might time out after 4ish hours; make sure you end training and save the results so you don't lose them!\n",
+        "\n",
+        "**IMPORTANT NOTE:** If you want to rerun this cell, **restart the VM first** (Runtime -> Restart Runtime). You will need to rerun imports but not recopy files.\n",
+        "\n",
+        "Other optional-but-helpful parameters for `gpt2.finetune`:\n",
+        "\n",
+        "\n",
+        "*  **`restore_from`**: Set to `fresh` to start training from the base GPT-2, or set to `latest` to restart training from an existing checkpoint.\n",
+        "* **`sample_every`**: Number of steps to print example output\n",
+        "* **`print_every`**: Number of steps to print training progress.\n",
+        "* **`learning_rate`**:  Learning rate for the training. (default `1e-4`, can lower to `1e-5` if you have <1MB input data)\n",
+        "*  **`run_name`**: subfolder within `checkpoint` to save the model. This is useful if you want to work with multiple models (will also need to specify  `run_name` when loading the model)\n",
+        "* **`overwrite`**: Set to `True` if you want to continue finetuning an existing model (w/ `restore_from='latest'`) without creating duplicate copies. "
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "aeXshJM-Cuaf",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "626fddf6-2002-42af-cbbb-a1671ae7cf38"
+      },
+      "source": [
+        "sess = gpt2.start_tf_sess()\n",
+        "\n",
+        "gpt2.finetune(sess,\n",
+        "              dataset=file_name,\n",
+        "              model_name='124M',\n",
+        "              steps=1000,\n",
+        "              restore_from='fresh',\n",
+        "              run_name='run1',\n",
+        "              print_every=10,\n",
+        "              sample_every=200,\n",
+        "              save_every=500\n",
+        "              )"
+      ],
+      "execution_count": 8,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "WARNING:tensorflow:From /usr/local/lib/python3.7/dist-packages/gpt_2_simple/src/sample.py:17: where (from tensorflow.python.ops.array_ops) is deprecated and will be removed in a future version.\n",
+            "Instructions for updating:\n",
+            "Use tf.where in 2.0, which has the same broadcast rule as np.where\n",
+            "Loading checkpoint models/124M/model.ckpt\n",
+            "INFO:tensorflow:Restoring parameters from models/124M/model.ckpt\n",
+            "Loading dataset...\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "100%|██████████| 1/1 [00:02<00:00,  2.09s/it]\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "dataset has 26880175 tokens\n",
+            "Training...\n",
+            "[10 | 75.72] loss=2.91 avg=2.91\n",
+            "[20 | 119.22] loss=2.71 avg=2.81\n",
+            "[30 | 162.75] loss=2.80 avg=2.81\n",
+            "[40 | 206.27] loss=2.76 avg=2.79\n",
+            "[50 | 249.79] loss=2.72 avg=2.78\n",
+            "[60 | 293.32] loss=2.79 avg=2.78\n",
+            "[70 | 336.80] loss=2.75 avg=2.78\n",
+            "[80 | 380.35] loss=2.78 avg=2.78\n",
+            "[90 | 423.88] loss=2.68 avg=2.77\n",
+            "[100 | 467.39] loss=2.66 avg=2.76\n",
+            "[110 | 510.96] loss=2.65 avg=2.74\n",
+            "[120 | 554.60] loss=2.72 avg=2.74\n",
+            "[130 | 598.17] loss=2.75 avg=2.74\n",
+            "[140 | 641.74] loss=2.62 avg=2.73\n",
+            "[150 | 685.25] loss=2.71 avg=2.73\n",
+            "[160 | 728.75] loss=2.57 avg=2.72\n",
+            "[170 | 772.24] loss=2.65 avg=2.72\n",
+            "[180 | 815.67] loss=2.67 avg=2.71\n",
+            "[190 | 859.05] loss=2.55 avg=2.70\n",
+            "[200 | 902.42] loss=2.68 avg=2.70\n",
+            "======== SAMPLE 1 ========\n",
+            " rendetta for the tomatoes I had already sous videed a couple of times and let us prepare it later to assemble it in half before frying. I served it with chutley and a lemon. And I love the lemon dressing with the lime juice.<|endoftext|>\n",
+            "<|startoftext|>I had no intention of taking it to the meatball, it was in the way, the tomatoes. And it was really a delicious combination of flavors. So simple and delicious, and it came together easily. My only complaint is I had to have some time to prepare a meatball. And I suppose if your butcher takes you as a guest of the butcher-cafe, doesn't that leave the butcher waiting for you to cook it?<|endoftext|>\n",
+            "<|startoftext|>Absolutely love this recipe. I also have a very small, small meatball recipe for my meatball. Very satisfying, very moist and very tasty. Next time I will add to the tomatoes and basil.\n",
+            "\n",
+            "This is very easy to make, and a delightful way for me to add a side of roasted kale to some baked potato dishes for some leftover meatballs. The kale is a key to the salad and the spinach adds an interesting flavor that compliments the onion and lemon dressing. I made only two slabs and it was a great comfort meal.\n",
+            "\n",
+            "I highly recommend and would highly suggest making this for a Thanksgiving dinner.<|endoftext|>\n",
+            "<|startoftext|>Excellent and very tasty, easy and very easy to eat. I recommend adding a little butter to the tomatoes.<|endoftext|>\n",
+            "<|startoftext|>LOVED IT!<|endoftext|>\n",
+            "<|startoftext|>Made this for a dinner party for 3 people. We were looking for a quick dinner recipe.  The first time I ever made meatballs I had to cook it in a slow cooker.  I found the flavor was very intense, particularly after about an hour of cooking time.  One thing I would like to add, is that after 1 hour the meatballs were very dense and juicy.  A wonderful recipe.  Also, I can't really remember what method of preparation you used (not a butcher like an \"easy\" way to prepare a meatball).<|endoftext|>\n",
+            "<|startoftext|>Delicious! I substituted the tomato, used a red pepper and the lemon juice.  Just good.\n",
+            "\n",
+            "My family loved it, I enjoyed the whole idea of marinating it in olive oil and adding tomato paste. I think with the other notes I just used a medium sized chicken instead of an actual meatball. <br/><br/>I may have gone down easy route here if the recipe sounds like it might be easier for those of us who are not meatballs, but don't say there isn't something else good to be had.<|endoftext|>\n",
+            "<|startoftext|>I like the idea of a slow cooker! I've made it almost once, with a vegetarian friend, and it was just delicious.  I used two large chicken breasts as well. I would definitely make this again!<|endoftext|>\n",
+            "<|startoftext|>Serve it with:\n",
+            "\n",
+            "1 lb pork shoulder\n",
+            "1 lb pork shoulder with garlic sliced\n",
+            "1 lb beef or boneless ribs\n",
+            "1/3 C smoked smoked paprika\n",
+            "2 T of fresh ground black pepper flakes\n",
+            "Salt and pepper, to taste<|endoftext|>\n",
+            "<|startoftext|>We loved this recipe. The meatballs had a nice texture, tender and light and very flavorful. I thought that next time I will add some herbs and maybe a drizzle of olive oil. Also, I will try sauteing onions in a skillet. I think I'll use whole wheat sausage instead of sausage, because some of the onion-plant combo seemed to help.\n",
+            "\n",
+            "I was worried about the lemon on the outside,  but it was a really lovely addition to the meatball. I am looking forward to making it again in 3 or 4 hours. I'll try to skip the lemon-vinegar dressing, but I don't have the lemon juice and I think it might be more appealing with the tomatoes. It was perfect with the chicken I made previously. I think the flavor would be better if I could add some lemon.<|endoftext|>\n",
+            "<|startoftext|>I made this as was, and it was beautiful but delicious. I served with scallions and a bit of mustard greens as well as a little lemon juice. I served it with a whole boneless chicken breast as well. I thought it was fantastic.<|endoftext|>\n",
+            "<|startoftext|>A bit of lemon on the outside would probably be fine, but the lemon dressing is pretty good. Will need to make\n",
+            "\n",
+            "[210 | 963.41] loss=2.48 avg=2.69\n",
+            "[220 | 1006.79] loss=2.63 avg=2.69\n",
+            "[230 | 1050.19] loss=2.60 avg=2.68\n",
+            "[240 | 1093.60] loss=2.55 avg=2.68\n",
+            "[250 | 1137.00] loss=2.64 avg=2.68\n",
+            "[260 | 1180.41] loss=2.67 avg=2.68\n",
+            "[270 | 1223.78] loss=2.58 avg=2.67\n",
+            "[280 | 1267.12] loss=2.61 avg=2.67\n",
+            "[290 | 1310.44] loss=2.62 avg=2.67\n",
+            "[300 | 1353.82] loss=2.66 avg=2.67\n",
+            "[310 | 1397.23] loss=2.54 avg=2.66\n",
+            "[320 | 1440.57] loss=2.72 avg=2.66\n",
+            "[330 | 1483.98] loss=2.73 avg=2.67\n",
+            "[340 | 1527.30] loss=2.52 avg=2.66\n",
+            "[350 | 1570.60] loss=2.49 avg=2.66\n",
+            "[360 | 1614.01] loss=2.54 avg=2.65\n",
+            "[370 | 1657.36] loss=2.55 avg=2.65\n",
+            "[380 | 1700.74] loss=2.65 avg=2.65\n",
+            "[390 | 1744.09] loss=2.63 avg=2.65\n",
+            "[400 | 1787.49] loss=2.44 avg=2.64\n",
+            "======== SAMPLE 1 ========\n",
+            " Most I did with an 8-inch stick of butter and it was very buttery. This makes it more like 1/2-inch butter than about 2 tablespoons.  I think that it's probably too much butter.  I think the recipe is also better when a 9-inch cup of butter is fine too!<|endoftext|>\n",
+            "<|startoftext|>I used butter and found that it worked better than this. I did the only thing I think that I found inconsistent. I used a 3-3/8 cup of butter. What did not mix well. I also used 1/4 chicken breasts instead of a pound. I like chicken breasts! Otherwise it was very tasty.<|endoftext|>\n",
+            "<|startoftext|>I made this recipe. It was very good. So much butter.  I did not try using the immersion blender on the chicken and I do not think I could do with the full amount of butter - there was more than enough butter.<|endoftext|>\n",
+            "<|startoftext|>It wasn't overly buttery at all, if nothing else.<|endoftext|>\n",
+            "<|startoftext|>I used 6 large chicken thighs for breast, and used only 2 cups of stock. Also had to add a bit less butter for my breasts. The result was fantastic!<|endoftext|>\n",
+            "<|startoftext|>I did it for a group. I liked it but next time would use 2 cups of chicken and 2 lbs if I did half what I did. Would also roast the breast next time. <|endoftext|>\n",
+            "<|startoftext|>I don't have an 8-inch stick blender but I really like this recipe. This is very simple and easy and if it's the ratio I don't want to miss the trick. I also used 1/2 chicken breasts and 1 lb of breast.  And they weren’t overly buttery but still very buttery. Not only are the sauce a bit too liquidy, the chicken was a bit too greasy. I think next time I'd add some butter, if that’s what they have in stock so they don’t really need anything else.<|endoftext|>\n",
+            "<|startoftext|>This was a lovely dinner for a meal. It came together quickly, and the whole family loved it and my 6 year old and 14 year old all ate it up in the end. Very easy to make, and perfect for a picnic party. I will definitely make it again!<|endoftext|>\n",
+            "<|startoftext|>The sauce is heavy. I added more chicken. I should have tried the blender or if I try to use one I think a teaspoon of apple cider vinegar would have been helpful. I'm glad I decided to try the immersion blender.<|endoftext|>\n",
+            "<|startoftext|>I used 1 cup of butter and the recipe made 2 large chicken thighs. Used 2 and 1/2 chicken breasts.  Chicken was about the same size as the recipe, but it would have been better the second time for the chicken's size.  If adding cream I would use 1/2 cup of butter.<|endoftext|>\n",
+            "<|startoftext|>I've tried this recipe several times and have found it extremely forgiving.  With the same issue and the butter and the lemon. But it still needed 4 cups of chicken,  just the two ounces.  It was delicious!<|endoftext|>\n",
+            "<|startoftext|>I like to roast the chicken in the oven, in a 350 degree pan. Add about a tablespoon or so of cider and chicken will cook.<|endoftext|>\n",
+            "<|startoftext|>Easy recipe to make in an instant pot. We used one 14 oz chicken breasts and 3 1/2 lb chicken thighs. I used all chicken and 2 cups of stock. We will serve the recipe the next day after a long night of reading.<|endoftext|>\n",
+            "<|startoftext|>This is the first recipe I've ever made from a CSA. I used 3 1/2 chicken breasts and 1 pound skinless thighs. The other 4 1/2 breasts cooked up to perfection in my oven. Used fresh lemon juice to make it more watery and made for a delicious dressing. I did add a bit of honey to the sauce as others have said.<|endoftext|>\n",
+            "<|startoftext|>Add some water and lemon so it’s very watery, maybe 2 tablespoons? For a low fat/low sodium version: Add 3/4 cup chicken stock, 3/4 cup butter, or half 1 1/2 ounces chicken stock.  1 tablespoon of honey is much too much if you have some store bought honey on hand.  I\n",
+            "\n",
+            "[410 | 1847.11] loss=2.72 avg=2.64\n",
+            "[420 | 1890.43] loss=2.52 avg=2.64\n",
+            "[430 | 1933.70] loss=2.75 avg=2.64\n",
+            "[440 | 1977.04] loss=2.71 avg=2.65\n",
+            "[450 | 2020.38] loss=2.55 avg=2.64\n",
+            "[460 | 2063.75] loss=2.76 avg=2.65\n",
+            "[470 | 2107.14] loss=2.44 avg=2.64\n",
+            "[480 | 2150.55] loss=2.46 avg=2.64\n",
+            "[490 | 2193.92] loss=2.64 avg=2.64\n",
+            "[500 | 2237.33] loss=2.65 avg=2.64\n",
+            "Saving checkpoint/run1/model-500\n",
+            "[510 | 2284.16] loss=2.57 avg=2.64\n",
+            "[520 | 2327.56] loss=2.58 avg=2.63\n",
+            "[530 | 2370.99] loss=2.45 avg=2.63\n",
+            "[540 | 2414.36] loss=2.58 avg=2.63\n",
+            "[550 | 2457.62] loss=2.47 avg=2.62\n",
+            "[560 | 2501.01] loss=2.63 avg=2.62\n",
+            "[570 | 2544.81] loss=2.54 avg=2.62\n",
+            "[580 | 2588.69] loss=2.62 avg=2.62\n",
+            "[590 | 2632.60] loss=2.49 avg=2.62\n",
+            "[600 | 2676.52] loss=2.61 avg=2.62\n",
+            "======== SAMPLE 1 ========\n",
+            " diachronistic-based way to use this recipe.  I used a couple of different colors for a very light, bright, and festive mood.  I also added a sprinkle of salt to the sauce before I added the lemon.  It's perfect.<|endoftext|>\n",
+            "<|startoftext|>I substituted sweet potato with carrot and sweet onion with carrots. Very nice.<|endoftext|>\n",
+            "<|startoftext|>I tried this tonight, with a red onion instead. It did not turn out great, not just one piece, but in the pan, over and over. It got mushy on a wet side, so don't put it in the pan, just pour out as a pan. Don’t forget the spices, a lot of those are good, but you really want them.<|endoftext|>\n",
+            "<|startoftext|>This was wonderful.  Used panko bread to top bread (no sour cream) and used a small cup of vegetable broth instead of water.  I added some crushed red pepper with the shallots when I added in the milk, a couple of cloves to the milk as well as dried crushed black pepper flakes.  It was delicious.  Will definitely continue to cook it.  And I also think that the recipe is more about the texture of the butter rather than flavor.  This is an excellent addition to a simple-medium-cream recipe.<|endoftext|>\n",
+            "<|startoftext|>I used a whole can of pumpkin oil - I used 1/4 cup plus a can pumpkin seed and it was perfect. Also used 1 Tbl dark sherry instead of heavy. I used 1 cup of white wine + 1 cup white. It was great.<|endoftext|>\n",
+            "<|startoftext|>Added 1 Tbl regular milk (no sour cream) then 1 cups of the regular sauce + 1 tsp honey - perfect recipe!<|endoftext|>\n",
+            "<|startoftext|>This is probably the most successful recipe! I used 1 cup of cream, 1 cup of dark sherry + 1/2 tsp of dry sherry and served over rice with scallion rice and  lemon slices.<|endoftext|>\n",
+            "<|startoftext|>The whole lemon is worth the effort. I just love the fresh lemon<|endoftext|>\n",
+            "<|startoftext|>Delicious, I'm glad I use panko for the browned cheese too. Added about an eighth of a large head of garlic and lemon zest. Didn't bother to broil it up, cooked as written and just served. Very good!<|endoftext|>\n",
+            "<|startoftext|>Tried this - did not like the texture, I mixed with a little more cheese, and I thought it was very dry and very bitter<|endoftext|>\n",
+            "<|startoftext|>I added 3 cloves of minced garlic, ginger, red pepper, and a little ground black pepper to the sauce over the top of the milk for a really delicious brown sauce<|endoftext|>\n",
+            "<|startoftext|>The cream in the pan was very tasty but too much liquid. Maybe cut it by half. I used more carrots and added fresh rosemary. It was nice and light but not spicy like I think it might be to me and others in our household.<|endoftext|>\n",
+            "<|startoftext|>A nice light and flavorful lemon.<|endoftext|>\n",
+            "<|startoftext|>I agree with the reviewer who put the pan up high.  This is a great recipe!  I did not use any heavy cream.  I added the milk to the cream mixture and stirred it all together together before mixing.  I didn't broil it, I just put some of it in the pan.  It just made a very nice cream sauce.  Yum!  Thanks!<|endoftext|>\n",
+            "<|startoftext|>Used only 1/2 cup cream and 1 1/2 cups heavy cream.  Added one whole can of pumpkin oil and it did the trick.  Great recipe too.<|endoftext|>\n",
+            "<|startoftext|>I added the cream to the milk mixture and poured the mixture into a shallow bowl. My mother used to make it and now says it looks better.<|endoftext|>\n",
+            "<|startoftext|>As an adult, I loved this recipe! The taste was mild and fresh but the flavor is excellent.<|endoftext|>\n",
+            "<|startoftext|>Good sauce, but there's so much water that I don't follow the advice to use the full amount of it. I added just 1/2 cup of the butter in the sauce which made a delicious sauce.<|endoftext\n",
+            "\n",
+            "[610 | 2737.12] loss=2.54 avg=2.62\n",
+            "[620 | 2781.03] loss=2.50 avg=2.62\n",
+            "[630 | 2824.95] loss=2.57 avg=2.61\n",
+            "[640 | 2869.04] loss=2.63 avg=2.61\n",
+            "[650 | 2912.55] loss=2.58 avg=2.61\n",
+            "[660 | 2956.08] loss=2.49 avg=2.61\n",
+            "[670 | 2999.55] loss=2.51 avg=2.61\n",
+            "[680 | 3043.05] loss=2.53 avg=2.61\n",
+            "[690 | 3086.54] loss=2.46 avg=2.60\n",
+            "[700 | 3130.03] loss=2.55 avg=2.60\n",
+            "[710 | 3173.49] loss=2.47 avg=2.60\n",
+            "[720 | 3217.09] loss=2.57 avg=2.60\n",
+            "[730 | 3260.60] loss=2.53 avg=2.60\n",
+            "[740 | 3304.05] loss=2.50 avg=2.60\n",
+            "[750 | 3347.53] loss=2.36 avg=2.59\n",
+            "[760 | 3390.99] loss=2.59 avg=2.59\n",
+            "[770 | 3434.38] loss=2.56 avg=2.59\n",
+            "[780 | 3477.79] loss=2.51 avg=2.59\n",
+            "[790 | 3521.15] loss=2.56 avg=2.59\n",
+            "[800 | 3564.55] loss=2.62 avg=2.59\n",
+            "======== SAMPLE 1 ========\n",
+            "|>\n",
+            "<|startoftext|>So, I did not follow one of Mark Bittman's steps to follow the recipe. I followed the instructions to the letter, and my stove was about to go into low-heat mode. But the stove was burning. After making this, I could not get my oven to \"fantastic\" as was claimed—it was in the 20º+ range. This caused an even more difficult, and expensive, mess to come together. What the heck??<|endoftext|>\n",
+            "<|startoftext|>I used a Dutch oven for this and made one dish. It was excellent! One of the best Dutch ovens I have ever made. It made a big difference in cooking time, so it was delicious every time I make it.<|endoftext|>\n",
+            "<|startoftext|>This recipe is delicious!!\n",
+            "My son, who doesn't eat meat (i.e. chicken, turkey, pork) and a wife who just love chicken, loved this dish.  I served it alongside homemade chicken salad on a bed of arugula, broccoli and tomato as well as on top of the chicken.  (I always put it alongside broccoli and a jalapeño as I have done with other dishes)\n",
+            "One thing I added--and everyone else loved--was the fact that the oven could accommodate more peppers.  If you do that, and you have any of the peppers, then it will cook down a lot.  I only used one of the peppers (for a total of two).  I would make the recipe again if I had a more affordable Dutch oven recipe to serve with.  It makes very little difference in the food processor.  I will try this again when I can afford the more expensive recipes.  :)<|endoftext|>\n",
+            "<|startoftext|>My family loved this. As someone in the know, I use a small ceramic bowl and microwave a pot of broth. This is a really easy recipe. The only adjustments I made were I didn’t add any sugar as others recommended. Instead of using some of the leftover soup, I added some canned tomatoes, some fresh parsley, and some chopped bacon. For the last 25 years I have made this method exactly as listed and as stated it's good too.<|endoftext|>\n",
+            "<|startoftext|>This is a great recipe. The recipe notes in my own kitchen are that the soup should be made in the \"medium-low\" option with a bowl full of liquid. My family loved it. The only adjustment we made is to add a couple teaspoons of sugar and 1/2 cup of chopped smoked salt.  I used a Dutch oven for the first cook with a high setting and let it cook for at least an hour before I had trouble getting the soup to a higher temperature.  Very satisfying and easy meal with a great hearty meal.<|endoftext|>\n",
+            "<|startoftext|>Easy and delish!!! We made this tonight but I couldn't find the onion and cilantro so substituted lemon. It was tasty and easy. The pickles were a hit here. Thanks Mark!<|endoftext|>\n",
+            "<|startoftext|>Sausages are so versatile.  I used about half of the recipe in the original recipe so I was able to cook almost 2 full servings without any issues. I also used regular tomatoes - more than needed. I think the pickle will add a lot to the end result.<|endoftext|>\n",
+            "<|startoftext|>Loved this to the end!  I used a standard jarred tomato sauce from a jar (a little different than the one I normally use) for the sauce and it was very good....my family added garlic and onion to the tomato sauce as well as extra pepper and cumin to complement the tomato and onion.<|endoftext|>\n",
+            "<|startoftext|>I am an experienced cook so I made this with 3/4 of a box of frozen tomatoes and about 4/5 of a whole box chopped chicken, which I thought was way too small. I reduced the cooking time to 425 for 3 of them to serve. This turned out perfectly, but I thought it needed extra time to cook with the tomatoes. I will try the recipe again with the added time I had for the sauce, as next time I make it will definitely use the whole box of frozen tomatoes in the recipe.<|endoftext|>\n",
+            "<|startoftext|>The sauce was a hit and the pickle added a nice depth<|endoftext|>\n",
+            "<|startoftext|>This was very disappointing. I used an immersion blender to thicken everything up. Next time I will use my hands to make a mixture (not blender, but a food processor as my wife suggests) to combine the tomatoes with the sauce. I added\n",
+            "\n",
+            "[810 | 3624.29] loss=2.54 avg=2.59\n",
+            "[820 | 3667.66] loss=2.50 avg=2.59\n",
+            "[830 | 3711.01] loss=2.56 avg=2.59\n",
+            "[840 | 3754.36] loss=2.58 avg=2.59\n",
+            "[850 | 3797.79] loss=2.46 avg=2.59\n",
+            "[860 | 3841.14] loss=2.54 avg=2.58\n",
+            "[870 | 3884.49] loss=2.45 avg=2.58\n",
+            "[880 | 3927.90] loss=2.45 avg=2.58\n",
+            "[890 | 3971.26] loss=2.56 avg=2.58\n",
+            "[900 | 4014.59] loss=2.67 avg=2.58\n",
+            "[910 | 4057.96] loss=2.51 avg=2.58\n",
+            "[920 | 4101.57] loss=2.66 avg=2.58\n",
+            "[930 | 4145.08] loss=2.56 avg=2.58\n",
+            "[940 | 4188.68] loss=2.35 avg=2.58\n",
+            "[950 | 4232.21] loss=2.72 avg=2.58\n",
+            "[960 | 4275.65] loss=2.36 avg=2.58\n",
+            "[970 | 4319.23] loss=2.55 avg=2.58\n",
+            "[980 | 4362.75] loss=2.50 avg=2.57\n",
+            "[990 | 4406.20] loss=2.44 avg=2.57\n",
+            "[1000 | 4449.65] loss=2.59 avg=2.57\n",
+            "Saving checkpoint/run1/model-1000\n",
+            "WARNING:tensorflow:From /tensorflow-1.15.2/python3.7/tensorflow_core/python/training/saver.py:963: remove_checkpoint (from tensorflow.python.training.checkpoint_management) is deprecated and will be removed in a future version.\n",
+            "Instructions for updating:\n",
+            "Use standard file APIs to delete files with this prefix.\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "IXSuTNERaw6K"
+      },
+      "source": [
+        "After the model is trained, you can copy the checkpoint folder to your own Google Drive.\n",
+        "\n",
+        "If you want to download it to your personal computer, it's strongly recommended you copy it there first, then download from Google Drive. The checkpoint folder is copied as a `.rar` compressed file; you can download it and uncompress it locally."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "VHdTL8NDbAh3"
+      },
+      "source": [
+        "gpt2.copy_checkpoint_to_gdrive(run_name='run1')"
+      ],
+      "execution_count": 9,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "qQJgV_b4bmzd"
+      },
+      "source": [
+        "You're done! Feel free to go to the **Generate Text From The Trained Model** section to generate text based on your retrained model."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "pel-uBULXO2L"
+      },
+      "source": [
+        "## Load a Trained Model Checkpoint\n",
+        "\n",
+        "Running the next cell will copy the `.rar` checkpoint file from your Google Drive into the Colaboratory VM."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "DCcx5u7sbPTD"
+      },
+      "source": [
+        "gpt2.copy_checkpoint_from_gdrive(run_name='run1')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "RTa6zf3e_9gV"
+      },
+      "source": [
+        "The next cell will allow you to load the retrained model checkpoint + metadata necessary to generate text.\n",
+        "\n",
+        "**IMPORTANT NOTE:** If you want to rerun this cell, **restart the VM first** (Runtime -> Restart Runtime). You will need to rerun imports but not recopy files."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-fxL77nvAMAX"
+      },
+      "source": [
+        "sess = gpt2.start_tf_sess()\n",
+        "gpt2.load_gpt2(sess, run_name='run1')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ClJwpF_ACONp"
+      },
+      "source": [
+        "## Generate Text From The Trained Model\n",
+        "\n",
+        "After you've trained the model or loaded a retrained model from checkpoint, you can now generate text. `generate` generates a single text from the loaded model."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4RNY6RBI9LmL",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "1d1a7232-263b-496e-8705-234fd347f03e"
+      },
+      "source": [
+        "gpt2.generate(sess, run_name='run1')"
+      ],
+      "execution_count": 10,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            ">Would you rather use a lighter/chopped cucumber for the topping?<|endoftext|>\n",
+            "<|startoftext|>I’m surprised that the recipe for this is so vague and unclear: it can only be made in a Cuisinart. I’ve used a large cast iron skillet for the final product.<|endoftext|>\n",
+            "<|startoftext|>This was the first time I’ve ever had a cucumber salad and it was DELICIOUS. I’ve been making this recipe every summer since I was a little kid and it’s always a favorite. I also add a bit more salt and perhaps a sprinkle of nutmeg.<|endoftext|>\n",
+            "<|startoftext|>I love the mix of flavors at the end of the bowl.  It tastes like a salad of cucumbers, cherry tomatoes, and olives, and it’s so easy to clean up the mess and then combine the ingredients.  I’ve made this salad since I was a kid and it’s always in my fridge.<|endoftext|>\n",
+            "<|startoftext|>U2 would need to use a cleaner container for the cucumbers. So I used a small container and it came out just fine. I found that the cornmeal was too bland for me. The juice was a nice note.<|endoftext|>\n",
+            "<|startoftext|>I’ve made this salad several times now. It’s really good. I use a small jar of cornmeal in potato salad. I rub under a lot of cornmeal to make it more creamy and the whole thing seems to go into the blender after the cornmeal is removed. I usually add a little more cornmeal to the dressing before serving. I add the cucumbers at the end and then serve with a salad or salad on the side.<|endoftext|>\n",
+            "<|startoftext|>The cornmeal was overpowering. I think it should be strained to remove the yogurt.  I think the cucumbers were not added at the end.  I will try adding them as soon as I can.<|endoftext|>\n",
+            "<|startoftext|>I found the recipe to be overly sweet. The cornmeal really makes it taste like the salad. I would have liked more of a point of sweetness. Also I would have liked more of a hint of sweetness.<|endoftext|>\n",
+            "<|startoftext|>I took the advice of others and substituted ground cumin powder for the seeds and it was fine. I don't think the cornmeal was necessary. I think it would have been nice with a bit of spice and maybe some chopped olives or red pepper and I could see adding some chopped fresh mint, but not sure what I should add.<|endoftext|>\n",
+            "<|startoftext|>I made this yesterday for the second time.  I didn’t know I had so much mint and the flavors were amazing.  I added some dried mint and a little bit of nutmeg to make it a bit more robust.<|endoftext|>\n",
+            "<|startoftext|>I've made this salad several times now.  It's really good and not too sweet.  It's also a bit like a salad dressing.  I just use a little less cornmeal.  It's fine for a few days when I'm not eating or having any problems.<|endoftext|>\n",
+            "<|startoftext|>This salad is so good! I used fresh cucumber and it was perfect. I'm going to try it with some fresh parsley and some dried mint.<|endoftext|>\n",
+            "<|startoftext|>I agree with the suggestions of others. I added a little more cornmeal and it was fine. I agree the cornmeal isn't necessary and added some grated parm to complement the lemon zest and salt. I also added a little more olive oil and that was great. I think I'll add a bit more red pepper next time. I added a few anchovies instead of the cucumbers and it was great. I will make this again and again.<|endoftext|>\n",
+            "<|startoftext|>Agree with the other comments. Added a bit more parm. There was no lemon dressing next time. Ended up adding half a lemon to the dressing, and I think that was probably just to punch up the flavor.<|endoftext|>\n",
+            "<|startoftext|>Add some extra cilantro and olive oil to the dressing.  It was a nice balanced balance for me, and I think it's better with a little bit of salt.<|endoftext|>\n",
+            "<|startoftext|>I took the advice of other reviewers and used a range of\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "oF4-PqF0Fl7R"
+      },
+      "source": [
+        "If you're creating an API based on your model and need to pass the generated text elsewhere, you can do `text = gpt2.generate(sess, return_as_list=True)[0]`\n",
+        "\n",
+        "You can also pass in a `prefix` to the generate function to force the text to start with a given character sequence and generate text from there (good if you add an indicator when the text starts).\n",
+        "\n",
+        "You can also generate multiple texts at a time by specifing `nsamples`. Unique to GPT-2, you can pass a `batch_size` to generate multiple samples in parallel, giving a massive speedup (in Colaboratory, set a maximum of 20 for `batch_size`).\n",
+        "\n",
+        "Other optional-but-helpful parameters for `gpt2.generate` and friends:\n",
+        "\n",
+        "*  **`length`**: Number of tokens to generate (default 1023, the maximum)\n",
+        "* **`temperature`**: The higher the temperature, the crazier the text (default 0.7, recommended to keep between 0.7 and 1.0)\n",
+        "* **`top_k`**: Limits the generated guesses to the top *k* guesses (default 0 which disables the behavior; if the generated output is super crazy, you may want to set `top_k=40`)\n",
+        "* **`top_p`**: Nucleus sampling: limits the generated guesses to a cumulative probability. (gets good results on a dataset with `top_p=0.9`)\n",
+        "* **`truncate`**: Truncates the input text until a given sequence, excluding that sequence (e.g. if `truncate='<|endoftext|>'`, the returned text will include everything before the first `<|endoftext|>`). It may be useful to combine this with a smaller `length` if the input texts are short.\n",
+        "*  **`include_prefix`**: If using `truncate` and `include_prefix=False`, the specified `prefix` will not be included in the returned text."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8DKMc0fiej4N",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "ff76a0f2-c6d3-4570-cd70-532ade8ca3da"
+      },
+      "source": [
+        "gpt2.generate(sess,\n",
+        "              length=250,\n",
+        "              temperature=1.0,\n",
+        "              nsamples=5,\n",
+        "              batch_size=5\n",
+        "              )"
+      ],
+      "execution_count": 11,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "|<|startoftext|>We found this helpful. We followed the recipe exactly. I took up a cup of Tiramisu before trying it. It was fantastic- we loved it.<|endoftext|>\n",
+            "<|startoftext|>Any suggestions on what to do with the 8 oz. of water? Bummer.<|endoftext|>\n",
+            "<|startoftext|>Perfect!  Made the baby spinach and white whole wheat pasta based off of all the ratings, although made the amount as per the recipe. (Gotta use 1.5 cups of water for the spinach, otherwise it will be dry.)  Wow!  A bit cream with a little creaminess for those who don't like creamy pasta, but that's usually the way it's done.  Cherries skin on?<|endoftext|>\n",
+            "<|startoftext|>Added sriracha<|endoftext|>\n",
+            "<|startoftext|>This really didn't make it! I just loved it as is. I've reduced the water (and all other liquids) by 1 c. and that was plenty of spinach to add to the pot and for those just trying\n",
+            "====================\n",
+            "“Extra twilight andado with sambal oelek<|endoftext|>\n",
+            "<|startoftext|>You put some sugar bottle cloth inside a tube of Trimmer glasses, and pocket the Snickers. You’re on a cinch of yet other, more elegant ice cream pot. Just repeat 1-4-3-5 for 30 mins @ 10 to keep the icicles forming.. 15-17 for 30 min (~70 or so) or maybe 5 if you have it for dessert.<|endoftext|>\n",
+            "<|startoftext|>You probably really will love this one/served ice cream pot, so I have nothing but eggs and some shredded sharp cheddar.  I also did 1/2 recipe above and that also retards some of the vanilla.<|endoftext|>\n",
+            "<|startoftext|>substitute for white chocolate (in boiled eggs)<|endoftext|>\n",
+            "<|startoftext|>I agree that the amount of g factor should be something like 10 to make it perfectly chocolatey. If using bacon on top, you might want to nip that out before using.<|endoftext|>\n",
+            "====================\n",
+            "I am not a vegetarian but if you    you Vestigial Vegetarian then you can take mushrooms and peasant meat in - over cooked - with a spoonful each of classic stewed porkoulette and trotron, in a microwave-stronged waffle sandwich.<|endoftext|>\n",
+            "<|startoftext|>how do you get a Seder with spoons + celery + straw + chops + hash brown/cherry + oyster?  where do you put the fresh and dried mushrooms?  I add them only once or through a hot oven?<|endoftext|>\n",
+            "<|startoftext|>This is soup, unlike Meyer wheat, I DON'T like heavy cream and if I do use it then I will sub the thyme for the violets (I have neglected this in recipes).  I also like a sort of extra cheese on top that adds some more cheese- I like one of my all-time favorite warm cheese recipes here- delicious!  Also, my husband is more liberal--I usually haven't checked my fridge but he is always a little bit Of Course, Blend and one of my favorite YouTube courses<|endoftext\n",
+            "====================\n",
+            "H. What I'll do next...I’m not a long cook but I will use less white wine (banzeyo) and quadruple the ginger. Use a 9/12 cinnamon stick and add some crushed ginger (used maple syrup). Brown butter in a bowl and set everything to boil?  No, but cool it slowly & add the rest. Utter waste.<|endoftext|>\n",
+            "<|startoftext|>Whoa, this is coconut milk and I never thought \"50% dark brown coffee\".  I'll leave out the sugar (maybe because that whole milk recipe was the best I've ever tried).  It's more of a granola batter batter and cream - but cream-like in texture.<|endoftext|>\n",
+            "<|startoftext|>I can’t assemble this week, but I brought home a cream cheese mac n cheese to decorate the Christmas Eve and hoped to make this very at home.<|endoftext|>\n",
+            "<|startoftext|>The combo of whole milk with a vanilla bean whipped cream and frosting really made everything so rich. I’m thinking an orange zest maybe??? It made it just right\n",
+            "====================\n",
+            "<|startoftext|>Thank goodness I found it at my favorite store at divi dfinitii. It is delicious.<|endoftext|>\n",
+            "<|startoftext|>I hate saying this...burnt shrimp!  Adapted with IG ulalamita.<|endoftext|>\n",
+            "<|startoftext|>Definitely do more nutmeg a generation in. All good. <|endoftext|>\n",
+            "<|startoftext|>Do you add 2 crumbled chives or 1 whole hard boiled egg? One box bossa green beans or capone in a large bowl? So delicious recipe!!<|endoftext|>\n",
+            "<|startoftext|>I also texted during primo cooking that cooking the peanut butter was the secret for  a richer flavour. Um...<|endoftext|>\n",
+            "<|startoftext|>Live for 8 more hours a week so is it alright to break before leaving instructions???<|endoftext|>\n",
+            "<|startoftext|>An hour is not the same as two. Think about it: you put two sticks of butter on a bun to soak up the whole oil.<|\n",
+            "====================\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "zjjEN2Tafhl2"
+      },
+      "source": [
+        "For bulk generation, you can generate a large amount of text to a file and sort out the samples locally on your computer. The next cell will generate a generated text file with a unique timestamp.\n",
+        "\n",
+        "You can rerun the cells as many times as you want for even more generated texts!"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Fa6p6arifSL0"
+      },
+      "source": [
+        "gen_file = 'gpt2_gentext_{:%Y%m%d_%H%M%S}.txt'.format(datetime.utcnow())\n",
+        "\n",
+        "gpt2.generate_to_file(sess,\n",
+        "                      destination_path=gen_file,\n",
+        "                      length=500,\n",
+        "                      temperature=0.7,\n",
+        "                      nsamples=100,\n",
+        "                      batch_size=20\n",
+        "                      )"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "0-LRex8lfv1g"
+      },
+      "source": [
+        "# may have to run twice to get file to download\n",
+        "files.download(gen_file)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "QQAN3M6RT7Kj"
+      },
+      "source": [
+        "## Generate Text From The Pretrained Model\n",
+        "\n",
+        "If you want to generate text from the pretrained model, not a finetuned model, pass `model_name` to `gpt2.load_gpt2()` and `gpt2.generate()`.\n",
+        "\n",
+        "This is currently the only way to generate text from the 774M or 1558M models with this notebook."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "hsUd_jHgUZnD",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 158
+        },
+        "outputId": "4e0c8a3f-3527-41c4-e3fe-3357f3f8f6c2"
+      },
+      "source": [
+        "model_name = \"774M\"\n",
+        "\n",
+        "gpt2.download_gpt2(model_name=model_name)"
+      ],
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "Fetching checkpoint: 1.05Mit [00:00, 354Mit/s]                                                      \n",
+            "Fetching encoder.json: 1.05Mit [00:00, 131Mit/s]                                                    \n",
+            "Fetching hparams.json: 1.05Mit [00:00, 279Mit/s]                                                    \n",
+            "Fetching model.ckpt.data-00000-of-00001: 3.10Git [00:23, 131Mit/s]                                  \n",
+            "Fetching model.ckpt.index: 1.05Mit [00:00, 380Mit/s]                                                \n",
+            "Fetching model.ckpt.meta: 2.10Mit [00:00, 226Mit/s]                                                 \n",
+            "Fetching vocab.bpe: 1.05Mit [00:00, 199Mit/s]                                                       \n"
+          ],
+          "name": "stderr"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "BAe4NpKNUj2C",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 124
+        },
+        "outputId": "b09bfe1d-2ff8-4b8a-fffb-273d28d5d4ae"
+      },
+      "source": [
+        "sess = gpt2.start_tf_sess()\n",
+        "\n",
+        "gpt2.load_gpt2(sess, model_name=model_name)"
+      ],
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "WARNING: Logging before flag parsing goes to stderr.\n",
+            "W0828 18:37:58.571830 139905369159552 deprecation.py:323] From /usr/local/lib/python3.6/dist-packages/tensorflow/python/training/saver.py:1276: checkpoint_exists (from tensorflow.python.training.checkpoint_management) is deprecated and will be removed in a future version.\n",
+            "Instructions for updating:\n",
+            "Use standard file APIs to check for files with this prefix.\n"
+          ],
+          "name": "stderr"
+        },
+        {
+          "output_type": "stream",
+          "text": [
+            "Loading pretrained model models/774M/model.ckpt\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-xInIZKaU104",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 797
+        },
+        "outputId": "56348e28-7d08-45e3-c859-f26c0efd066d"
+      },
+      "source": [
+        "gpt2.generate(sess,\n",
+        "              model_name=model_name,\n",
+        "              prefix=\"The secret of life is\",\n",
+        "              length=100,\n",
+        "              temperature=0.7,\n",
+        "              top_p=0.9,\n",
+        "              nsamples=5,\n",
+        "              batch_size=5\n",
+        "              )"
+      ],
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "text": [
+            "The secret of life is that it's really easy to make it complicated,\" said Bill Nye, the host of the popular science show \"Bill Nye the Science Guy.\" \"And this is one of the reasons why we all need to be smarter about science, because we can't keep up with the amazing things that are going on all the time.\"\n",
+            "\n",
+            "While Nye is correct that \"everything that's going on all the time\" is making the world a better place, he misses the point. This is not\n",
+            "====================\n",
+            "The secret of life is in the rhythm of the universe. It's not a mystery. It's not a mystery to me. It's the nature of the universe. It's the beauty of the universe. It's the way the universe works. It's the way the universe is. It's the way the universe is going to work. It's the way the universe is. It's the way the universe is. It's the way the universe is. It's the way the universe is. It's the way\n",
+            "====================\n",
+            "The secret of life is in the universe.\n",
+            "\n",
+            "\n",
+            "-\n",
+            "\n",
+            "The Red Devil\n",
+            "\n",
+            "It's the end of the world as we know it, and the only thing that can save us is a band of super-powered individuals known as the Red Devil.\n",
+            "\n",
+            "\n",
+            "The Red Devil is a group of super-powered individuals who are seeking the secret of life and the only way they know how to do it is by taking on the roles of a variety of different super-powered individuals, each of which has their own\n",
+            "====================\n",
+            "The secret of life is in the mixing of the elements, and it is the mixing of the elements that makes life possible.\"\n",
+            "\n",
+            "But in the world of food science, the idea of a \"complex\" or \"complexity\" is almost entirely imaginary.\n",
+            "\n",
+            "As a scientist, I'm fascinated by the question of how life first began.\n",
+            "\n",
+            "It's the question that drives my work and the work of the scientists who work on it.\n",
+            "\n",
+            "My current research is exploring how microbes work in the first moments\n",
+            "====================\n",
+            "The secret of life is the journey of life, the search for the truth.\n",
+            "\n",
+            "4.4.2. The last thing you know\n",
+            "\n",
+            "There is nothing more important than the last thing you know.\n",
+            "\n",
+            "4.4.3. The little things that make all the difference\n",
+            "\n",
+            "The little things that make all the difference.\n",
+            "\n",
+            "4.4.4. The truth is the best teacher\n",
+            "\n",
+            "The truth is the best teacher.\n",
+            "\n",
+            "4.4.5. The truth is what\n",
+            "====================\n"
+          ],
+          "name": "stdout"
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "ig-KVgkCDCKD"
+      },
+      "source": [
+        "# Etcetera\n",
+        "\n",
+        "If the notebook has errors (e.g. GPU Sync Fail), force-kill the Colaboratory virtual machine and restart it with the command below:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "rIHiVP53FnsX"
+      },
+      "source": [
+        "!kill -9 -1"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "wmTXWNUygS5E"
+      },
+      "source": [
+        "# LICENSE\n",
+        "\n",
+        "MIT License\n",
+        "\n",
+        "Copyright (c) 2019 Max Woolf\n",
+        "\n",
+        "Permission is hereby granted, free of charge, to any person obtaining a copy\n",
+        "of this software and associated documentation files (the \"Software\"), to deal\n",
+        "in the Software without restriction, including without limitation the rights\n",
+        "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n",
+        "copies of the Software, and to permit persons to whom the Software is\n",
+        "furnished to do so, subject to the following conditions:\n",
+        "\n",
+        "The above copyright notice and this permission notice shall be included in all\n",
+        "copies or substantial portions of the Software.\n",
+        "\n",
+        "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n",
+        "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n",
+        "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n",
+        "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n",
+        "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n",
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n",
+        "SOFTWARE."
+      ]
+    }
+  ]
+}
